@@ -70,7 +70,10 @@ export default BaseBarSeries.extend({
             shadowColor: null,
             shadowOffsetX: 0,
             shadowOffsetY: 0,
-            opacity: 1
+            opacity: 1,
+            // Sampling for large data. Can be: 'average', 'max', 'min', 'sum'.
+            sampling: 'none',
+            samplingRate: 1
         }
     }
 });

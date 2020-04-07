@@ -1711,52 +1711,61 @@ listProto.map = function (dimensions, cb, context, contextCompat) {
  * @param {Function} sampleIndex Sample index for name and id
  */
 listProto.downSample = function (dimension, rate, sampleValue, sampleIndex) {
-    var list = cloneListForMapAndSample(this, [dimension]);
+    dimension = Array.isArray(dimension) ? dimension : [dimension];
+    var list = cloneListForMapAndSample(this, dimension);
     var targetStorage = list._storage;
-
-    var frameValues = [];
-    var frameSize = Math.floor(1 / rate);
-
-    var dimStore = targetStorage[dimension];
     var len = this.count();
-    var chunkSize = this._chunkSize;
-    var rawExtentOnDim = list._rawExtent[dimension];
-
     var newIndices = new (getIndicesCtor(this))(len);
+    var chunkSize = this._chunkSize;
+    var newOffset = 0;
 
-    var offset = 0;
-    for (var i = 0; i < len; i += frameSize) {
-        // Last frame
-        if (frameSize > len - i) {
-            frameSize = len - i;
-            frameValues.length = frameSize;
-        }
-        for (var k = 0; k < frameSize; k++) {
-            var dataIdx = this.getRawIndex(i + k);
-            var originalChunkIndex = Math.floor(dataIdx / chunkSize);
-            var originalChunkOffset = dataIdx % chunkSize;
-            frameValues[k] = dimStore[originalChunkIndex][originalChunkOffset];
-        }
-        var value = sampleValue(frameValues);
-        var sampleFrameIdx = this.getRawIndex(
-            Math.min(i + sampleIndex(frameValues, value) || 0, len - 1)
-        );
-        var sampleChunkIndex = Math.floor(sampleFrameIdx / chunkSize);
-        var sampleChunkOffset = sampleFrameIdx % chunkSize;
-        // Only write value on the filtered data
-        dimStore[sampleChunkIndex][sampleChunkOffset] = value;
+    for (var dimIdx = 0, dimLen = dimension.length; dimIdx < dimLen; dimIdx++) {
+        var dim = dimension[dimIdx]
+        var frameValues = [];
+        var frameSize = Math.floor(1 / rate);
+        var dimStore = targetStorage[dim];
+        var rawExtentOnDim = list._rawExtent[dim];
+        var offset = 0;
 
-        if (value < rawExtentOnDim[0]) {
-            rawExtentOnDim[0] = value;
-        }
-        if (value > rawExtentOnDim[1]) {
-            rawExtentOnDim[1] = value;
+        for (var i = 0; i < len; i += frameSize) {
+            // Last frame
+            if (frameSize > len - i) {
+                frameSize = len - i;
+                frameValues.length = frameSize;
+            }
+            for (var k = 0; k < frameSize; k++) {
+                var dataIdx = this.getRawIndex(i + k);
+                var originalChunkIndex = Math.floor(dataIdx / chunkSize);
+                var originalChunkOffset = dataIdx % chunkSize;
+                frameValues[k] = dimStore[originalChunkIndex][originalChunkOffset];
+            }
+            var value = sampleValue(frameValues, dim);
+            var sampleFrameIdx = this.getRawIndex(
+                Math.min(i + sampleIndex(frameValues, value) || 0, len - 1)
+            );
+            var sampleChunkIndex = Math.floor(sampleFrameIdx / chunkSize);
+            var sampleChunkOffset = sampleFrameIdx % chunkSize;
+            // Only write value on the filtered data
+            dimStore[sampleChunkIndex][sampleChunkOffset] = value;
+
+            if (value < rawExtentOnDim[0]) {
+                rawExtentOnDim[0] = value;
+            }
+            if (value > rawExtentOnDim[1]) {
+                rawExtentOnDim[1] = value;
+            }
+
+            if (dimIdx === 0) {
+                newIndices[offset++] = sampleFrameIdx;
+            }
         }
 
-        newIndices[offset++] = sampleFrameIdx;
+        if (dimIdx === 0) {
+            newOffset = offset;
+        }
     }
 
-    list._count = offset;
+    list._count = newOffset;
     list._indices = newIndices;
 
     list.getRawIndex = getRawIndexWithIndices;

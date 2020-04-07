@@ -26,6 +26,14 @@ import preprocessor from './candlestick/preprocessor';
 import candlestickVisual from './candlestick/candlestickVisual';
 import candlestickLayout from './candlestick/candlestickLayout';
 
+import dataSample from '../processor/dataSample';
+
 echarts.registerPreprocessor(preprocessor);
 echarts.registerVisual(candlestickVisual);
 echarts.registerLayout(candlestickLayout);
+
+// Down sample after filter
+echarts.registerProcessor(
+    echarts.PRIORITY.PROCESSOR.STATISTIC,
+    dataSample('candlestick')
+);

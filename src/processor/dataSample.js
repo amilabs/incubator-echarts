@@ -76,6 +76,7 @@ export default function (seriesType) {
         reset: function (seriesModel, ecModel, api) {
             var data = seriesModel.getData();
             var sampling = seriesModel.get('sampling');
+            var samplingRate = Number(seriesModel.get('samplingRate') || 1);
             var coordSys = seriesModel.coordinateSystem;
             // Only cartesian2d support down sampling
             if (coordSys.type === 'cartesian2d' && sampling) {
@@ -84,7 +85,7 @@ export default function (seriesType) {
                 var extent = baseAxis.getExtent();
                 // Coordinste system has been resized
                 var size = extent[1] - extent[0];
-                var rate = Math.round(data.count() / size);
+                var rate = Math.round(data.count() / (size / samplingRate));
                 if (rate > 1) {
                     var sampler;
                     if (typeof sampling === 'string') {
@@ -94,10 +95,15 @@ export default function (seriesType) {
                         sampler = sampling;
                     }
                     if (sampler) {
-                        // Only support sample the first dim mapped from value axis.
-                        seriesModel.setData(data.downSample(
-                            data.mapDimension(valueAxis.dim), 1 / rate, sampler, indexSampler
-                        ));
+                        var nextData;
+                        if (seriesType === 'candlestick') {
+                            nextData = data.downSample(['open', 'close', 'highest', 'lowest'], 1 / rate, sampler, indexSampler);
+                        } else {
+                            // Only support sample the first dim mapped from value axis.
+                            var dim = data.mapDimension(valueAxis.dim);
+                            nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);
+                        }
+                        seriesModel.setData(nextData);
                     }
                 }
             }

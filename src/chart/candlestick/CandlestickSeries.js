@@ -90,7 +90,11 @@ var CandlestickSeries = SeriesModel.extend({
 
         animationUpdate: false,
         animationEasing: 'linear',
-        animationDuration: 300
+        animationDuration: 300,
+
+        // Sampling for large data. Can be: 'average', 'max', 'min', 'sum'.
+        sampling: 'none',
+        samplingRate: 1
     },
 
     /**

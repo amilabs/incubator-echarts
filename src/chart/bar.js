@@ -20,6 +20,7 @@
 import * as echarts from '../echarts';
 import * as zrUtil from 'zrender/src/core/util';
 import {layout, largeLayout} from '../layout/barGrid';
+import dataSample from '../processor/dataSample';
 
 import '../coord/cartesian/Grid';
 import './bar/BarSeries';
@@ -40,3 +41,10 @@ echarts.registerVisual({
         seriesModel.getData().setVisual('legendSymbol', 'roundRect');
     }
 });
+
+// Down sample after filter
+echarts.registerProcessor(
+    echarts.PRIORITY.PROCESSOR.STATISTIC,
+    dataSample('bar')
+);
+

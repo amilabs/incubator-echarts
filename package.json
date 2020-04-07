@@ -1,5 +1,5 @@
 {
-  "name": "echarts",
+  "name": "@rikishi/echarts",
   "version": "4.7.0",
   "description": "A powerful charting and visualization library for browser",
   "license": "Apache-2.0",

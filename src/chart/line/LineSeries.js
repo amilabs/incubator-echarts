@@ -93,6 +93,7 @@ export default SeriesModel.extend({
 
         // Sampling for large data. Can be: 'average', 'max', 'min', 'sum'.
         sampling: 'none',
+        samplingRate: 1,
 
         animationEasing: 'linear',
 
