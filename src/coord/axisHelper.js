@@ -317,7 +317,7 @@ export function makeLabelFormatter(axis) {
             if (categoryTickStart != null) {
                 idx = tickValue - categoryTickStart;
             }
-            return labelFormatter(getAxisRawValue(axis, tickValue), idx);
+            return labelFormatter(getAxisRawValue(axis, tickValue), idx, axis);
         };
     }
     else {

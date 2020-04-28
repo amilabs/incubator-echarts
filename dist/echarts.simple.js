@@ -13098,7 +13098,30 @@ var extremity = create();
  * @param {number} min
  * @param {number} max
  */
+function fromPoints(points, min$$1, max$$1) {
+    if (points.length === 0) {
+        return;
+    }
+    var p = points[0];
+    var left = p[0];
+    var right = p[0];
+    var top = p[1];
+    var bottom = p[1];
+    var i;
 
+    for (i = 1; i < points.length; i++) {
+        p = points[i];
+        left = mathMin$3(left, p[0]);
+        right = mathMax$3(right, p[0]);
+        top = mathMin$3(top, p[1]);
+        bottom = mathMax$3(bottom, p[1]);
+    }
+
+    min$$1[0] = left;
+    min$$1[1] = top;
+    max$$1[0] = right;
+    max$$1[1] = bottom;
+}
 
 /**
  * @memberOf module:zrender/core/bbox
@@ -17420,11 +17443,13 @@ function getHighlightDigit(highlightKey) {
  * @param {Object} opt Check `opt` of `setTextStyleCommon` to find other props.
  * @param {string|Function} [opt.defaultText]
  * @param {module:echarts/model/Model} [opt.labelFetcher] Fetch text by
- *      `opt.labelFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
- * @param {module:echarts/model/Model} [opt.labelDataIndex] Fetch text by
- *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
- * @param {module:echarts/model/Model} [opt.labelDimIndex] Fetch text by
- *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
+ *      `opt.labelFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {number} [opt.labelDataIndex] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {number} [opt.labelDimIndex] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {string} [opt.labelProp] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
  * @param {Object} [normalSpecified]
  * @param {Object} [emphasisSpecified]
  */
@@ -17438,6 +17463,7 @@ function setLabelStyle(
     var labelFetcher = opt.labelFetcher;
     var labelDataIndex = opt.labelDataIndex;
     var labelDimIndex = opt.labelDimIndex;
+    var labelProp = opt.labelProp;
 
     // This scenario, `label.normal.show = true; label.emphasis.show = false`,
     // is not supported util someone requests.
@@ -17451,7 +17477,7 @@ function setLabelStyle(
     var baseText;
     if (showNormal || showEmphasis) {
         if (labelFetcher) {
-            baseText = labelFetcher.getFormattedLabel(labelDataIndex, 'normal', null, labelDimIndex);
+            baseText = labelFetcher.getFormattedLabel(labelDataIndex, 'normal', null, labelDimIndex, labelProp);
         }
         if (baseText == null) {
             baseText = isFunction$1(opt.defaultText) ? opt.defaultText(labelDataIndex, opt) : opt.defaultText;
@@ -17461,7 +17487,7 @@ function setLabelStyle(
     var emphasisStyleText = showEmphasis
         ? retrieve2(
             labelFetcher
-                ? labelFetcher.getFormattedLabel(labelDataIndex, 'emphasis', null, labelDimIndex)
+                ? labelFetcher.getFormattedLabel(labelDataIndex, 'emphasis', null, labelDimIndex, labelProp)
                 : null,
             baseText
         )
@@ -19280,7 +19306,7 @@ function nice(val, round) {
 // import Text from 'zrender/src/graphic/Text';
 
 /**
- * 每三位默认加,格式化
+ * add commas after every three numbers
  * @param {string|number} x
  * @return {string}
  */
@@ -19493,6 +19519,13 @@ var truncateText$1 = truncateText;
  * the `textLineHeight` was added later.
  * For backward compatiblility, put it as the last parameter.
  * But deprecated this interface. Please use `getTextBoundingRect` instead.
+ */
+
+
+/**
+ * open new tab
+ * @param {string} link url
+ * @param {string} target blank or self
  */
 
 /*
@@ -25374,11 +25407,16 @@ var loadingDefault = function (api, opts) {
     opts = opts || {};
     defaults(opts, {
         text: 'loading',
-        color: '#c23531',
         textColor: '#000',
+        fontSize: '12px',
         maskColor: 'rgba(255, 255, 255, 0.8)',
+        showSpinner: true,
+        color: '#c23531',
+        spinnerRadius: 10,
+        lineWidth: 5,
         zlevel: 0
     });
+    var group = new Group();
     var mask = new Rect({
         style: {
             fill: opts.maskColor
@@ -25386,24 +25424,13 @@ var loadingDefault = function (api, opts) {
         zlevel: opts.zlevel,
         z: 10000
     });
-    var arc = new Arc({
-        shape: {
-            startAngle: -PI$1 / 2,
-            endAngle: -PI$1 / 2 + 0.1,
-            r: 10
-        },
-        style: {
-            stroke: opts.color,
-            lineCap: 'round',
-            lineWidth: 5
-        },
-        zlevel: opts.zlevel,
-        z: 10001
-    });
+    group.add(mask);
+    var font = opts.fontSize + ' sans-serif';
     var labelRect = new Rect({
         style: {
             fill: 'none',
             text: opts.text,
+            font: font,
             textPosition: 'right',
             textDistance: 10,
             textFill: opts.textColor
@@ -25411,32 +25438,49 @@ var loadingDefault = function (api, opts) {
         zlevel: opts.zlevel,
         z: 10001
     });
-
-    arc.animateShape(true)
-        .when(1000, {
-            endAngle: PI$1 * 3 / 2
-        })
-        .start('circularInOut');
-    arc.animateShape(true)
-        .when(1000, {
-            startAngle: PI$1 * 3 / 2
-        })
-        .delay(300)
-        .start('circularInOut');
-
-    var group = new Group();
-    group.add(arc);
     group.add(labelRect);
-    group.add(mask);
+    if (opts.showSpinner) {
+        var arc = new Arc({
+            shape: {
+                startAngle: -PI$1 / 2,
+                endAngle: -PI$1 / 2 + 0.1,
+                r: opts.spinnerRadius
+            },
+            style: {
+                stroke: opts.color,
+                lineCap: 'round',
+                lineWidth: opts.lineWidth
+            },
+            zlevel: opts.zlevel,
+            z: 10001
+        });
+        arc.animateShape(true)
+            .when(1000, {
+                endAngle: PI$1 * 3 / 2
+            })
+            .start('circularInOut');
+        arc.animateShape(true)
+            .when(1000, {
+                startAngle: PI$1 * 3 / 2
+            })
+            .delay(300)
+            .start('circularInOut');
+        group.add(arc);
+    }
     // Inject resize
     group.resize = function () {
-        var cx = api.getWidth() / 2;
+        var textWidth = getWidth(opts.text, font);
+        var r = opts.showSpinner ? opts.spinnerRadius : 0;
+        // cx = (containerWidth - arcDiameter - textDistance - textWidth) / 2
+        // textDistance needs to be calculated when both animation and text exist
+        var cx = (api.getWidth() - r * 2 - (opts.showSpinner && textWidth ? 10 : 0) - textWidth) / 2
+               // only show the text
+               - (opts.showSpinner ? 0 : textWidth / 2);
         var cy = api.getHeight() / 2;
-        arc.setShape({
+        opts.showSpinner && arc.setShape({
             cx: cx,
             cy: cy
         });
-        var r = arc.shape.r;
         labelRect.setShape({
             x: cx - r,
             y: cy - r,
@@ -34636,6 +34680,10 @@ function createGridClipPath(cartesian, hasAnimation, seriesModel) {
     width += lineWidth;
     height += lineWidth;
 
+    // fix: https://github.com/apache/incubator-echarts/issues/11369
+    x = Math.floor(x);
+    width = Math.round(width);
+
     var clipPath = new Rect({
         shape: {
             x: x,
@@ -34731,6 +34779,26 @@ function isPointsSame(points1, points2) {
         }
     }
     return true;
+}
+
+function getBoundingDiff(points1, points2) {
+    var min1 = [];
+    var max1 = [];
+
+    var min2 = [];
+    var max2 = [];
+
+    fromPoints(points1, min1, max1);
+    fromPoints(points2, min2, max2);
+
+    // Get a max value from each corner of two boundings.
+    return Math.max(
+        Math.abs(min1[0] - min2[0]),
+        Math.abs(min1[1] - min2[1]),
+
+        Math.abs(max1[0] - max2[0]),
+        Math.abs(max1[1] - max2[1])
+    );
 }
 
 function getSmooth(smooth) {
@@ -35345,6 +35413,24 @@ Chart.extend({
             next = turnPointsIntoStep(diff.next, coordSys, step);
             stackedOnNext = turnPointsIntoStep(diff.stackedOnNext, coordSys, step);
         }
+        // Don't apply animation if diff is large.
+        // For better result and avoid memory explosion problems like
+        // https://github.com/apache/incubator-echarts/issues/12229
+        if (getBoundingDiff(current, next) > 3000
+            || (polygon && getBoundingDiff(stackedOnCurrent, stackedOnNext) > 3000)
+        ) {
+            polyline.setShape({
+                points: next
+            });
+            if (polygon) {
+                polygon.setShape({
+                    points: next,
+                    stackedOnPoints: stackedOnNext
+                });
+            }
+            return;
+        }
+
         // `diff.current` is subset of `current` (which should be ensured by
         // turnPointsIntoStep), so points in `__points` can be updated when
         // points in `current` are update during animation.
@@ -37786,7 +37872,7 @@ function makeLabelFormatter(axis) {
             if (categoryTickStart != null) {
                 idx = tickValue - categoryTickStart;
             }
-            return labelFormatter(getAxisRawValue(axis, tickValue), idx);
+            return labelFormatter(getAxisRawValue(axis, tickValue), idx, axis);
         };
     }
     else {
@@ -43329,31 +43415,36 @@ piePieceProto.updateData = function (data, idx, firstCreate) {
     var withAnimation = !firstCreate && animationTypeUpdate === 'transition';
     this._updateLabel(data, idx, withAnimation);
 
-    this.highDownOnUpdate = (itemModel.get('hoverAnimation') && seriesModel.isAnimationEnabled())
+    this.highDownOnUpdate = !seriesModel.get('silent')
         ? function (fromState, toState) {
+            var hasAnimation = seriesModel.isAnimationEnabled() && itemModel.get('hoverAnimation');
             if (toState === 'emphasis') {
                 labelLine.ignore = labelLine.hoverIgnore;
                 labelText.ignore = labelText.hoverIgnore;
 
                 // Sector may has animation of updating data. Force to move to the last frame
                 // Or it may stopped on the wrong shape
-                sector.stopAnimation(true);
-                sector.animateTo({
-                    shape: {
-                        r: layout.r + seriesModel.get('hoverOffset')
-                    }
-                }, 300, 'elasticOut');
+                if (hasAnimation) {
+                    sector.stopAnimation(true);
+                    sector.animateTo({
+                        shape: {
+                            r: layout.r + seriesModel.get('hoverOffset')
+                        }
+                    }, 300, 'elasticOut');
+                }
             }
             else {
                 labelLine.ignore = labelLine.normalIgnore;
                 labelText.ignore = labelText.normalIgnore;
 
-                sector.stopAnimation(true);
-                sector.animateTo({
-                    shape: {
-                        r: layout.r
-                    }
-                }, 300, 'elasticOut');
+                if (hasAnimation) {
+                    sector.stopAnimation(true);
+                    sector.animateTo({
+                        shape: {
+                            r: layout.r
+                        }
+                    }, 300, 'elasticOut');
+                }
             }
         }
         : null;

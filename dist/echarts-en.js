@@ -17838,11 +17838,13 @@ function getHighlightDigit(highlightKey) {
  * @param {Object} opt Check `opt` of `setTextStyleCommon` to find other props.
  * @param {string|Function} [opt.defaultText]
  * @param {module:echarts/model/Model} [opt.labelFetcher] Fetch text by
- *      `opt.labelFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
- * @param {module:echarts/model/Model} [opt.labelDataIndex] Fetch text by
- *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
- * @param {module:echarts/model/Model} [opt.labelDimIndex] Fetch text by
- *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex)`
+ *      `opt.labelFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {number} [opt.labelDataIndex] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {number} [opt.labelDimIndex] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
+ * @param {string} [opt.labelProp] Fetch text by
+ *      `opt.textFetcher.getFormattedLabel(opt.labelDataIndex, 'normal'/'emphasis', null, opt.labelDimIndex, opt.labelProp)`
  * @param {Object} [normalSpecified]
  * @param {Object} [emphasisSpecified]
  */
@@ -17856,6 +17858,7 @@ function setLabelStyle(
     var labelFetcher = opt.labelFetcher;
     var labelDataIndex = opt.labelDataIndex;
     var labelDimIndex = opt.labelDimIndex;
+    var labelProp = opt.labelProp;
 
     // This scenario, `label.normal.show = true; label.emphasis.show = false`,
     // is not supported util someone requests.
@@ -17869,7 +17872,7 @@ function setLabelStyle(
     var baseText;
     if (showNormal || showEmphasis) {
         if (labelFetcher) {
-            baseText = labelFetcher.getFormattedLabel(labelDataIndex, 'normal', null, labelDimIndex);
+            baseText = labelFetcher.getFormattedLabel(labelDataIndex, 'normal', null, labelDimIndex, labelProp);
         }
         if (baseText == null) {
             baseText = isFunction$1(opt.defaultText) ? opt.defaultText(labelDataIndex, opt) : opt.defaultText;
@@ -17879,7 +17882,7 @@ function setLabelStyle(
     var emphasisStyleText = showEmphasis
         ? retrieve2(
             labelFetcher
-                ? labelFetcher.getFormattedLabel(labelDataIndex, 'emphasis', null, labelDimIndex)
+                ? labelFetcher.getFormattedLabel(labelDataIndex, 'emphasis', null, labelDimIndex, labelProp)
                 : null,
             baseText
         )
@@ -19790,7 +19793,7 @@ var number = (Object.freeze || Object)({
 // import Text from 'zrender/src/graphic/Text';
 
 /**
- * 每三位默认加,格式化
+ * add commas after every three numbers
  * @param {string|number} x
  * @return {string}
  */
@@ -20043,6 +20046,22 @@ function getTextRect(
     );
 }
 
+/**
+ * open new tab
+ * @param {string} link url
+ * @param {string} target blank or self
+ */
+function windowOpen(link, target) {
+    if (target === '_blank' || target === 'blank') {
+        var blank = window.open();
+        blank.opener = null;
+        blank.location = link;
+    }
+    else {
+        window.open(link, target);
+    }
+}
+
 
 var format = (Object.freeze || Object)({
 	addCommas: addCommas,
@@ -20056,7 +20075,8 @@ var format = (Object.freeze || Object)({
 	capitalFirst: capitalFirst,
 	truncateText: truncateText$1,
 	getTextBoundingRect: getTextBoundingRect,
-	getTextRect: getTextRect
+	getTextRect: getTextRect,
+	windowOpen: windowOpen
 });
 
 /*
@@ -25782,6 +25802,32 @@ var lang = {
             lang: ['Right Click to Save Image']
         }
     },
+    series: {
+        typeNames: {
+            pie: 'Pie chart',
+            bar: 'Bar chart',
+            line: 'Line chart',
+            scatter: 'Scatter plot',
+            effectScatter: 'Ripple scatter plot',
+            radar: 'Radar chart',
+            tree: 'Tree',
+            treemap: 'Treemap',
+            boxplot: 'Boxplot',
+            candlestick: 'Candlestick',
+            k: 'K line chart',
+            heatmap: 'Heat map',
+            map: 'Map',
+            parallel: 'Parallel coordinate map',
+            lines: 'Line graph',
+            graph: 'Relationship graph',
+            sankey: 'Sankey diagram',
+            funnel: 'Funnel chart',
+            gauge: 'Guage',
+            pictorialBar: 'Pictorial bar',
+            themeRiver: 'Theme River Map',
+            sunburst: 'Sunburst'
+        }
+    },
     aria: {
         general: {
             withTitle: 'This is a chart about "{title}"',
@@ -26014,11 +26060,16 @@ var loadingDefault = function (api, opts) {
     opts = opts || {};
     defaults(opts, {
         text: 'loading',
-        color: '#c23531',
         textColor: '#000',
+        fontSize: '12px',
         maskColor: 'rgba(255, 255, 255, 0.8)',
+        showSpinner: true,
+        color: '#c23531',
+        spinnerRadius: 10,
+        lineWidth: 5,
         zlevel: 0
     });
+    var group = new Group();
     var mask = new Rect({
         style: {
             fill: opts.maskColor
@@ -26026,24 +26077,13 @@ var loadingDefault = function (api, opts) {
         zlevel: opts.zlevel,
         z: 10000
     });
-    var arc = new Arc({
-        shape: {
-            startAngle: -PI$1 / 2,
-            endAngle: -PI$1 / 2 + 0.1,
-            r: 10
-        },
-        style: {
-            stroke: opts.color,
-            lineCap: 'round',
-            lineWidth: 5
-        },
-        zlevel: opts.zlevel,
-        z: 10001
-    });
+    group.add(mask);
+    var font = opts.fontSize + ' sans-serif';
     var labelRect = new Rect({
         style: {
             fill: 'none',
             text: opts.text,
+            font: font,
             textPosition: 'right',
             textDistance: 10,
             textFill: opts.textColor
@@ -26051,32 +26091,49 @@ var loadingDefault = function (api, opts) {
         zlevel: opts.zlevel,
         z: 10001
     });
-
-    arc.animateShape(true)
-        .when(1000, {
-            endAngle: PI$1 * 3 / 2
-        })
-        .start('circularInOut');
-    arc.animateShape(true)
-        .when(1000, {
-            startAngle: PI$1 * 3 / 2
-        })
-        .delay(300)
-        .start('circularInOut');
-
-    var group = new Group();
-    group.add(arc);
     group.add(labelRect);
-    group.add(mask);
+    if (opts.showSpinner) {
+        var arc = new Arc({
+            shape: {
+                startAngle: -PI$1 / 2,
+                endAngle: -PI$1 / 2 + 0.1,
+                r: opts.spinnerRadius
+            },
+            style: {
+                stroke: opts.color,
+                lineCap: 'round',
+                lineWidth: opts.lineWidth
+            },
+            zlevel: opts.zlevel,
+            z: 10001
+        });
+        arc.animateShape(true)
+            .when(1000, {
+                endAngle: PI$1 * 3 / 2
+            })
+            .start('circularInOut');
+        arc.animateShape(true)
+            .when(1000, {
+                startAngle: PI$1 * 3 / 2
+            })
+            .delay(300)
+            .start('circularInOut');
+        group.add(arc);
+    }
     // Inject resize
     group.resize = function () {
-        var cx = api.getWidth() / 2;
+        var textWidth = getWidth(opts.text, font);
+        var r = opts.showSpinner ? opts.spinnerRadius : 0;
+        // cx = (containerWidth - arcDiameter - textDistance - textWidth) / 2
+        // textDistance needs to be calculated when both animation and text exist
+        var cx = (api.getWidth() - r * 2 - (opts.showSpinner && textWidth ? 10 : 0) - textWidth) / 2
+               // only show the text
+               - (opts.showSpinner ? 0 : textWidth / 2);
         var cy = api.getHeight() / 2;
-        arc.setShape({
+        opts.showSpinner && arc.setShape({
             cx: cx,
             cy: cy
         });
-        var r = arc.shape.r;
         labelRect.setShape({
             x: cx - r,
             y: cy - r,
@@ -35540,7 +35597,7 @@ function makeLabelFormatter(axis) {
             if (categoryTickStart != null) {
                 idx = tickValue - categoryTickStart;
             }
-            return labelFormatter(getAxisRawValue(axis, tickValue), idx);
+            return labelFormatter(getAxisRawValue(axis, tickValue), idx, axis);
         };
     }
     else {
@@ -38808,6 +38865,10 @@ function createGridClipPath(cartesian, hasAnimation, seriesModel) {
     width += lineWidth;
     height += lineWidth;
 
+    // fix: https://github.com/apache/incubator-echarts/issues/11369
+    x = Math.floor(x);
+    width = Math.round(width);
+
     var clipPath = new Rect({
         shape: {
             x: x,
@@ -38903,6 +38964,26 @@ function isPointsSame(points1, points2) {
         }
     }
     return true;
+}
+
+function getBoundingDiff(points1, points2) {
+    var min1 = [];
+    var max1 = [];
+
+    var min2 = [];
+    var max2 = [];
+
+    fromPoints(points1, min1, max1);
+    fromPoints(points2, min2, max2);
+
+    // Get a max value from each corner of two boundings.
+    return Math.max(
+        Math.abs(min1[0] - min2[0]),
+        Math.abs(min1[1] - min2[1]),
+
+        Math.abs(max1[0] - max2[0]),
+        Math.abs(max1[1] - max2[1])
+    );
 }
 
 function getSmooth(smooth) {
@@ -39517,6 +39598,24 @@ Chart.extend({
             next = turnPointsIntoStep(diff.next, coordSys, step);
             stackedOnNext = turnPointsIntoStep(diff.stackedOnNext, coordSys, step);
         }
+        // Don't apply animation if diff is large.
+        // For better result and avoid memory explosion problems like
+        // https://github.com/apache/incubator-echarts/issues/12229
+        if (getBoundingDiff(current, next) > 3000
+            || (polygon && getBoundingDiff(stackedOnCurrent, stackedOnNext) > 3000)
+        ) {
+            polyline.setShape({
+                points: next
+            });
+            if (polygon) {
+                polygon.setShape({
+                    points: next,
+                    stackedOnPoints: stackedOnNext
+                });
+            }
+            return;
+        }
+
         // `diff.current` is subset of `current` (which should be ensured by
         // turnPointsIntoStep), so points in `__points` can be updated when
         // points in `current` are update during animation.
@@ -44748,31 +44847,36 @@ piePieceProto.updateData = function (data, idx, firstCreate) {
     var withAnimation = !firstCreate && animationTypeUpdate === 'transition';
     this._updateLabel(data, idx, withAnimation);
 
-    this.highDownOnUpdate = (itemModel.get('hoverAnimation') && seriesModel.isAnimationEnabled())
+    this.highDownOnUpdate = !seriesModel.get('silent')
         ? function (fromState, toState) {
+            var hasAnimation = seriesModel.isAnimationEnabled() && itemModel.get('hoverAnimation');
             if (toState === 'emphasis') {
                 labelLine.ignore = labelLine.hoverIgnore;
                 labelText.ignore = labelText.hoverIgnore;
 
                 // Sector may has animation of updating data. Force to move to the last frame
                 // Or it may stopped on the wrong shape
-                sector.stopAnimation(true);
-                sector.animateTo({
-                    shape: {
-                        r: layout.r + seriesModel.get('hoverOffset')
-                    }
-                }, 300, 'elasticOut');
+                if (hasAnimation) {
+                    sector.stopAnimation(true);
+                    sector.animateTo({
+                        shape: {
+                            r: layout.r + seriesModel.get('hoverOffset')
+                        }
+                    }, 300, 'elasticOut');
+                }
             }
             else {
                 labelLine.ignore = labelLine.normalIgnore;
                 labelText.ignore = labelText.normalIgnore;
 
-                sector.stopAnimation(true);
-                sector.animateTo({
-                    shape: {
-                        r: layout.r
-                    }
-                }, 300, 'elasticOut');
+                if (hasAnimation) {
+                    sector.stopAnimation(true);
+                    sector.animateTo({
+                        shape: {
+                            r: layout.r
+                        }
+                    }, 300, 'elasticOut');
+                }
             }
         }
         : null;
@@ -50894,11 +50998,14 @@ TreeNode.prototype = {
         var hostTree = this.hostTree;
         var itemModel = hostTree.data.getItemModel(this.dataIndex);
         var levelModel = this.getLevelModel();
-        var leavesModel;
-        if (!levelModel && (this.children.length === 0 || (this.children.length !== 0 && this.isExpand === false))) {
-            leavesModel = this.getLeavesModel();
+
+        // FIXME: refactor levelModel to "beforeLink", and remove levelModel here.
+        if (levelModel) {
+            return itemModel.getModel(path, levelModel.getModel(path));
         }
-        return itemModel.getModel(path, (levelModel || leavesModel || hostTree.hostModel).getModel(path));
+        else {
+            return itemModel.getModel(path);
+        }
     },
 
     /**
@@ -50906,13 +51013,6 @@ TreeNode.prototype = {
      */
     getLevelModel: function () {
         return (this.hostTree.levelModels || [])[this.depth];
-    },
-
-    /**
-     * @return {module:echarts/model/Model}
-     */
-    getLeavesModel: function () {
-        return this.hostTree.leavesModel;
     },
 
     /**
@@ -50985,9 +51085,8 @@ TreeNode.prototype = {
  * @alias module:echarts/data/Tree
  * @param {module:echarts/model/Model} hostModel
  * @param {Array.<Object>} levelOptions
- * @param {Object} leavesOption
  */
-function Tree(hostModel, levelOptions, leavesOption) {
+function Tree(hostModel, levelOptions) {
     /**
      * @type {module:echarts/data/Tree~TreeNode}
      * @readOnly
@@ -51023,7 +51122,6 @@ function Tree(hostModel, levelOptions, leavesOption) {
         return new Model(levelDefine, hostModel, hostModel.ecModel);
     });
 
-    this.leavesModel = new Model(leavesOption || {}, hostModel, hostModel.ecModel);
 }
 
 Tree.prototype = {
@@ -51115,12 +51213,11 @@ Tree.prototype = {
  * @param {module:echarts/model/Model} hostModel
  * @param {Object} treeOptions
  * @param {Array.<Object>} treeOptions.levels
- * @param {Array.<Object>} treeOptions.leaves
  * @return module:echarts/data/Tree
  */
 Tree.createTree = function (dataRoot, hostModel, treeOptions, beforeLink) {
 
-    var tree = new Tree(hostModel, treeOptions.levels, treeOptions.leaves);
+    var tree = new Tree(hostModel, treeOptions && treeOptions.levels);
     var listData = [];
     var dimMax = 1;
 
@@ -51157,6 +51254,8 @@ Tree.createTree = function (dataRoot, hostModel, treeOptions, beforeLink) {
     var list = new List(dimensionsInfo, hostModel);
     list.initData(listData);
 
+    beforeLink && beforeLink(list);
+
     linkList({
         mainData: list,
         struct: tree,
@@ -51164,8 +51263,6 @@ Tree.createTree = function (dataRoot, hostModel, treeOptions, beforeLink) {
     });
 
     tree.update();
-
-    beforeLink && beforeLink(list);
 
     return tree;
 };
@@ -51226,17 +51323,13 @@ SeriesModel.extend({
         var root = {name: option.name, children: option.data};
 
         var leaves = option.leaves || {};
+        var leavesModel = new Model(leaves, this, this.ecModel);
 
-        var treeOption = {};
-
-        treeOption.leaves = leaves;
-
-        var tree = Tree.createTree(root, this, treeOption, beforeLink);
+        var tree = Tree.createTree(root, this, {}, beforeLink);
 
         function beforeLink(nodeData) {
             nodeData.wrapMethod('getItemModel', function (model, idx) {
                 var node = tree.getNodeByDataIndex(idx);
-                var leavesModel = node.getLeavesModel();
                 if (!node.children.length || !node.isExpand) {
                     model.parentModel = leavesModel;
                 }
@@ -52851,15 +52944,25 @@ SeriesModel.extend({
         var levels = option.levels || [];
 
         levels = option.levels = setDefault(levels, ecModel);
-
-        var treeOption = {};
-
-        treeOption.levels = levels;
+        var levelModels = map(levels || [], function (levelDefine) {
+            return new Model(levelDefine, this, ecModel);
+        }, this);
 
         // Make sure always a new tree is created when setOption,
         // in TreemapView, we check whether oldTree === newTree
         // to choose mappings approach among old shapes and new shapes.
-        return Tree.createTree(root, this, treeOption).data;
+        var tree = Tree.createTree(root, this, null, beforeLink);
+
+        function beforeLink(nodeData) {
+            nodeData.wrapMethod('getItemModel', function (model, idx) {
+                var node = tree.getNodeByDataIndex(idx);
+                var levelModel = levelModels[node.depth];
+                levelModel && (model.parentModel = levelModel);
+                return model;
+            });
+        }
+
+        return tree.data;
     },
 
     optionUpdated: function () {
@@ -53870,7 +53973,7 @@ extendChartView({
                     var itemModel = node.hostTree.data.getItemModel(node.dataIndex);
                     var link = itemModel.get('link', true);
                     var linkTarget = itemModel.get('target', true) || 'blank';
-                    link && window.open(link, linkTarget);
+                    link && windowOpen(link, linkTarget);
                 }
             }
 
@@ -54060,7 +54163,7 @@ function renderNode(
 
     // Background
     var bg = giveGraphic('background', Rect$1, depth, Z_BG);
-    bg && renderBackground(group, bg, isParent && thisLayout.upperHeight);
+    bg && renderBackground(group, bg, isParent && thisLayout.upperLabelHeight);
 
     // No children, render content.
     if (isParent) {
@@ -54181,16 +54284,7 @@ function renderNode(
     }
 
     function prepareText(normalStyle, emphasisStyle, visualColor, width, height, upperLabelRect) {
-        var text = retrieve(
-            seriesModel.getFormattedLabel(
-                thisNode.dataIndex, 'normal', null, null, upperLabelRect ? 'upperLabel' : 'label'
-            ),
-            nodeModel.get('name')
-        );
-        if (!upperLabelRect && thisLayout.isLeafRoot) {
-            var iconChar = seriesModel.get('drillDownIcon', true);
-            text = iconChar ? iconChar + ' ' + text : text;
-        }
+        var defaultText = nodeModel.get('name');
 
         var normalLabelModel = nodeModel.getModel(
             upperLabelRect ? PATH_UPPERLABEL_NORMAL : PATH_LABEL_NOAMAL
@@ -54204,11 +54298,17 @@ function renderNode(
         setLabelStyle(
             normalStyle, emphasisStyle, normalLabelModel, emphasisLabelModel,
             {
-                defaultText: isShow ? text : null,
+                defaultText: isShow ? defaultText : null,
                 autoColor: visualColor,
-                isRectText: true
+                isRectText: true,
+                labelFetcher: seriesModel,
+                labelDataIndex: thisNode.dataIndex,
+                labelProp: upperLabelRect ? 'upperLabel' : 'label'
             }
         );
+
+        addDrillDownIcon(normalStyle, upperLabelRect, thisLayout);
+        addDrillDownIcon(emphasisStyle, upperLabelRect, thisLayout);
 
         upperLabelRect && (normalStyle.textRect = clone(upperLabelRect));
 
@@ -54219,6 +54319,14 @@ function renderNode(
                 minChar: 2
             }
             : null;
+    }
+
+    function addDrillDownIcon(style, upperLabelRect, thisLayout) {
+        var text = style.text;
+        if (!upperLabelRect && thisLayout.isLeafRoot && text != null) {
+            var iconChar = seriesModel.get('drillDownIcon', true);
+            style.text = iconChar ? iconChar + ' ' + text : text;
+        }
     }
 
     function giveGraphic(storageName, Ctor, depth, z) {
@@ -57391,9 +57499,13 @@ lineDrawProto.incrementalPrepareUpdate = function (lineData) {
     this.group.removeAll();
 };
 
+function isEffectObject(el) {
+    return el.animators && el.animators.length > 0;
+}
+
 lineDrawProto.incrementalUpdate = function (taskParams, lineData) {
     function updateIncrementalAndHover(el) {
-        if (!el.isGroup) {
+        if (!el.isGroup && !isEffectObject(el)) {
             el.incremental = el.useHoverLayer = true;
         }
     }
@@ -64443,7 +64555,13 @@ function relaxRightToLeft(nodesByBreadth, alpha, orient) {
         each$1(nodes, function (node) {
             if (node.outEdges.length) {
                 var y = sum(node.outEdges, weightedTarget, orient)
-                        / sum(node.outEdges, getEdgeValue, orient);
+                    / sum(node.outEdges, getEdgeValue, orient);
+
+                if (isNaN(y)) {
+                    var len = node.outEdges.length;
+                    y = len ? sum(node.outEdges, centerTarget, orient) / len : 0;
+                }
+
                 if (orient === 'vertical') {
                     var nodeX = node.getLayout().x + (y - center$1(node, orient)) * alpha;
                     node.setLayout({x: nodeX}, true);
@@ -64460,9 +64578,15 @@ function relaxRightToLeft(nodesByBreadth, alpha, orient) {
 function weightedTarget(edge, orient) {
     return center$1(edge.node2, orient) * edge.getValue();
 }
+function centerTarget(edge, orient) {
+    return center$1(edge.node2, orient);
+}
 
 function weightedSource(edge, orient) {
     return center$1(edge.node1, orient) * edge.getValue();
+}
+function centerSource(edge, orient) {
+    return center$1(edge.node1, orient);
 }
 
 function center$1(node, orient) {
@@ -64499,8 +64623,15 @@ function relaxLeftToRight(nodesByBreadth, alpha, orient) {
     each$1(nodesByBreadth, function (nodes) {
         each$1(nodes, function (node) {
             if (node.inEdges.length) {
+
                 var y = sum(node.inEdges, weightedSource, orient)
-                        / sum(node.inEdges, getEdgeValue, orient);
+                    / sum(node.inEdges, getEdgeValue, orient);
+
+                if (isNaN(y)) {
+                    var len = node.inEdges.length;
+                    y = len ? sum(node.inEdges, centerSource, orient) / len : 0;
+                }
+
                 if (orient === 'vertical') {
                     var nodeX = node.getLayout().x + (y - center$1(node, orient)) * alpha;
                     node.setLayout({x: nodeX}, true);
@@ -73015,6 +73146,8 @@ SunburstPieceProto.updateData = function (
 
     this._seriesModel = seriesModel || this._seriesModel;
     this._ecModel = ecModel || this._ecModel;
+
+    setHoverStyle(this);
 };
 
 SunburstPieceProto.onEmphasis = function (highlightPolicy) {
@@ -73478,7 +73611,7 @@ var SunburstView = Chart.extend({
                         if (link) {
                             var linkTarget = itemModel.get('target', true)
                                 || '_blank';
-                            window.open(link, linkTarget);
+                            windowOpen(link, linkTarget);
                         }
                     }
                     targetFound = true;
@@ -77402,7 +77535,10 @@ Calendar.prototype = {
         var allDay = Math.floor(range[1].time / PROXIMATE_ONE_DAY)
             - Math.floor(range[0].time / PROXIMATE_ONE_DAY) + 1;
 
-        // Consider case:
+        // Consider case1 (#11677 #10430):
+        // Set the system timezone as "UK", set the range to `['2016-07-01', '2016-12-31']`
+
+        // Consider case2:
         // Firstly set system timezone as "Time Zone: America/Toronto",
         // ```
         // var first = new Date(1478412000000 - 3600 * 1000 * 2.5);
@@ -77415,11 +77551,15 @@ Calendar.prototype = {
         var endDateNum = range[1].date.getDate();
         date.setDate(startDateNum + allDay - 1);
         // The bias can not over a month, so just compare date.
-        if (date.getDate() !== endDateNum) {
+        var dateNum = date.getDate();
+        if (dateNum !== endDateNum) {
             var sign = date.getTime() - range[1].time > 0 ? 1 : -1;
-            while (date.getDate() !== endDateNum && (date.getTime() - range[1].time) * sign > 0) {
+            while (
+                (dateNum = date.getDate()) !== endDateNum
+                && (date.getTime() - range[1].time) * sign > 0
+            ) {
                 allDay -= sign;
-                date.setDate(startDateNum + allDay - 1);
+                date.setDate(dateNum - sign);
             }
         }
 
@@ -83692,7 +83832,7 @@ extendComponentView({
         var dataModel = el.dataModel || seriesModel;
         var dataIndex = el.dataIndex;
         var dataType = el.dataType;
-        var data = dataModel.getData();
+        var data = dataModel.getData(dataType);
 
         var tooltipModel = buildTooltipModel([
             data.getItemModel(dataIndex),
@@ -85490,12 +85630,12 @@ extendComponentView({
 
         if (link) {
             textEl.on('click', function () {
-                window.open(link, '_' + titleModel.get('target'));
+                windowOpen(link, '_' + titleModel.get('target'));
             });
         }
         if (sublink) {
             subTextEl.on('click', function () {
-                window.open(sublink, '_' + titleModel.get('subtarget'));
+                windowOpen(link, '_' + titleModel.get('subtarget'));
             });
         }
 
