@@ -71666,7 +71666,7 @@ function getValueLabel(value, axis, ecModel, seriesDataIndices, opt) {
             text = formatter.replace('{value}', text);
         }
         else if (isFunction$1(formatter)) {
-            text = formatter(params);
+            text = formatter(params, axis);
         }
     }
 
