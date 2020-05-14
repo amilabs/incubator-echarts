@@ -39984,12 +39984,13 @@ var dataSample = function (seriesType) {
                         var nextData;
                         if (seriesType === 'candlestick') {
                             nextData = data.downSample(
-                                ['open', 'close', 'highest', 'lowest'],
+                                ['open', 'close', 'highest', 'lowest', 'orig'],
                                 1 / rate,
                                 sampler,
                                 indexSampler
                             );
-                        } else {
+                        }
+                        else {
                             // Only support sample the first dim mapped from value axis.
                             var dim = data.mapDimension(valueAxis.dim);
                             nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);

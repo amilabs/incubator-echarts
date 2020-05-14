@@ -99,7 +99,7 @@ export default function (seriesType) {
                         var nextData;
                         if (seriesType === 'candlestick') {
                             nextData = data.downSample(
-                                ['open', 'close', 'highest', 'lowest'],
+                                ['open', 'close', 'highest', 'lowest', 'orig'],
                                 1 / rate,
                                 sampler,
                                 indexSampler
