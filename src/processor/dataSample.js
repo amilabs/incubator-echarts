@@ -63,7 +63,8 @@ var samplers = {
 };
 
 var indexSampler = function (frame, value) {
-    return Math.round(frame.length / 2);
+    // return Math.round(frame.length / 2);
+    return frame.length - 1;
 };
 
 export default function (seriesType) {
@@ -97,8 +98,14 @@ export default function (seriesType) {
                     if (sampler) {
                         var nextData;
                         if (seriesType === 'candlestick') {
-                            nextData = data.downSample(['open', 'close', 'highest', 'lowest'], 1 / rate, sampler, indexSampler);
-                        } else {
+                            nextData = data.downSample(
+                                ['open', 'close', 'highest', 'lowest'],
+                                1 / rate,
+                                sampler,
+                                indexSampler
+                            );
+                        }
+                        else {
                             // Only support sample the first dim mapped from value axis.
                             var dim = data.mapDimension(valueAxis.dim);
                             nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);

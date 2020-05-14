@@ -23459,6 +23459,18 @@ var dataFormatMixin = {
         var isSeries = mainType === 'series';
         var userOutput = data.userOutput;
 
+        var startRawValue = null;
+        var startRawDataIndex = Math.max(0, data.getRawIndex(dataIndex - 1) + 1);
+        if (startRawDataIndex !== rawDataIndex) {
+            var dimensions = data.dimensions;
+            rawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, rawDataIndex);
+            });
+            startRawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, startRawDataIndex);
+            });
+        }
+
         return {
             componentType: mainType,
             componentSubType: this.subType,
@@ -23472,6 +23484,7 @@ var dataFormatMixin = {
             data: itemOpt,
             dataType: dataType,
             value: rawValue,
+            startValue: startRawValue,
             color: color,
             borderColor: borderColor,
             dimensionNames: userOutput ? userOutput.dimensionNames : null,
@@ -35750,7 +35763,8 @@ var samplers = {
 };
 
 var indexSampler = function (frame, value) {
-    return Math.round(frame.length / 2);
+    // return Math.round(frame.length / 2);
+    return frame.length - 1;
 };
 
 var dataSample = function (seriesType) {
@@ -35784,7 +35798,12 @@ var dataSample = function (seriesType) {
                     if (sampler) {
                         var nextData;
                         if (seriesType === 'candlestick') {
-                            nextData = data.downSample(['open', 'close', 'highest', 'lowest'], 1 / rate, sampler, indexSampler);
+                            nextData = data.downSample(
+                                ['open', 'close', 'highest', 'lowest'],
+                                1 / rate,
+                                sampler,
+                                indexSampler
+                            );
                         } else {
                             // Only support sample the first dim mapped from value axis.
                             var dim = data.mapDimension(valueAxis.dim);

@@ -46,6 +46,18 @@ export default {
         var isSeries = mainType === 'series';
         var userOutput = data.userOutput;
 
+        var startRawValue = null;
+        var startRawDataIndex = Math.max(0, data.getRawIndex(dataIndex - 1) + 1);
+        if (startRawDataIndex !== rawDataIndex) {
+            var dimensions = data.dimensions;
+            rawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, rawDataIndex);
+            });
+            startRawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, startRawDataIndex);
+            });
+        }
+
         return {
             componentType: mainType,
             componentSubType: this.subType,
@@ -59,6 +71,7 @@ export default {
             data: itemOpt,
             dataType: dataType,
             value: rawValue,
+            startValue: startRawValue,
             color: color,
             borderColor: borderColor,
             dimensionNames: userOutput ? userOutput.dimensionNames : null,
