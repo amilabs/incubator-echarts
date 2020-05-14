@@ -1,6 +1,6 @@
 {
-  "name": "@rikishi/echarts",
-  "version": "4.8.0-rc.2",
+  "name": "echarts",
+  "version": "4.8.0-rc.10",
   "description": "A powerful charting and visualization library for browser",
   "license": "Apache-2.0",
   "keywords": [

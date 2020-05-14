@@ -239,7 +239,7 @@ function updateZoomBtnStatus(featureModel, ecModel, view, payload, api) {
                 brushStyle: {
                     // FIXME user customized?
                     lineWidth: 0,
-                    fill: 'rgba(0,0,0,0.2)'
+                    fill: featureModel.option.backgroundColor || 'rgba(0,0,0,0.2)'
                 }
             }
             : false

@@ -264,10 +264,20 @@ function trigger(controller, eventName, behaviorToCheck, e, contollerEvent) {
 // }
 // The value can be: true / false / 'shift' / 'ctrl' / 'alt'.
 function isAvailableBehavior(behaviorToCheck, e, settings) {
+    if (!behaviorToCheck) {
+        return true;
+    }
+
     var setting = settings[behaviorToCheck];
-    return !behaviorToCheck || (
-        setting && (!zrUtil.isString(setting) || e.event[setting + 'Key'])
-    );
+    if (setting === true) {
+        return true;
+    }
+
+    if (e.event[setting + 'Key']) {
+        return true;
+    }
+
+    return false;
 }
 
 export default RoamController;

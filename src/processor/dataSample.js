@@ -63,7 +63,8 @@ var samplers = {
 };
 
 var indexSampler = function (frame, value) {
-    return Math.round(frame.length / 2);
+    // return Math.round(frame.length / 2);
+    return frame.length - 1;
 };
 
 export default function (seriesType) {
@@ -77,6 +78,7 @@ export default function (seriesType) {
             var data = seriesModel.getData();
             var sampling = seriesModel.get('sampling');
             var samplingRate = Number(seriesModel.get('samplingRate') || 1);
+            var samplingDim = Array.isArray(seriesModel.get('samplingDim')) ? seriesModel.get('samplingDim') : false;
             var coordSys = seriesModel.coordinateSystem;
             // Only cartesian2d support down sampling
             if (coordSys.type === 'cartesian2d' && sampling) {
@@ -95,14 +97,9 @@ export default function (seriesType) {
                         sampler = sampling;
                     }
                     if (sampler) {
-                        var nextData;
-                        if (seriesType === 'candlestick') {
-                            nextData = data.downSample(['open', 'close', 'highest', 'lowest'], 1 / rate, sampler, indexSampler);
-                        } else {
-                            // Only support sample the first dim mapped from value axis.
-                            var dim = data.mapDimension(valueAxis.dim);
-                            nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);
-                        }
+                        // Only support sample the first dim mapped from value axis.
+                        var dim = samplingDim || data.mapDimension(valueAxis.dim);
+                        var nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);
                         seriesModel.setData(nextData);
                     }
                 }

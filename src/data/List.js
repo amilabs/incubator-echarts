@@ -1720,7 +1720,7 @@ listProto.downSample = function (dimension, rate, sampleValue, sampleIndex) {
     var newOffset = 0;
 
     for (var dimIdx = 0, dimLen = dimension.length; dimIdx < dimLen; dimIdx++) {
-        var dim = dimension[dimIdx]
+        var dim = dimension[dimIdx];
         var frameValues = [];
         var frameSize = Math.floor(1 / rate);
         var dimStore = targetStorage[dim];

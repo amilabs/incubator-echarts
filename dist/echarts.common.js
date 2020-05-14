@@ -23998,6 +23998,18 @@ var dataFormatMixin = {
         var isSeries = mainType === 'series';
         var userOutput = data.userOutput;
 
+        var startRawValue = null;
+        var startRawDataIndex = Math.max(0, data.getRawIndex(dataIndex - 1) + 1);
+        if (startRawDataIndex !== rawDataIndex) {
+            var dimensions = data.dimensions;
+            rawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, rawDataIndex);
+            });
+            startRawValue = dimensions.map(function (name) {
+                return data.getByRawIndex(name, startRawDataIndex);
+            });
+        }
+
         return {
             componentType: mainType,
             componentSubType: this.subType,
@@ -24011,6 +24023,7 @@ var dataFormatMixin = {
             data: itemOpt,
             dataType: dataType,
             value: rawValue,
+            startValue: startRawValue,
             color: color,
             borderColor: borderColor,
             dimensionNames: userOutput ? userOutput.dimensionNames : null,
@@ -39825,7 +39838,8 @@ var samplers = {
 };
 
 var indexSampler = function (frame, value) {
-    return Math.round(frame.length / 2);
+    // return Math.round(frame.length / 2);
+    return frame.length - 1;
 };
 
 var dataSample = function (seriesType) {
@@ -39839,6 +39853,7 @@ var dataSample = function (seriesType) {
             var data = seriesModel.getData();
             var sampling = seriesModel.get('sampling');
             var samplingRate = Number(seriesModel.get('samplingRate') || 1);
+            var samplingDim = Array.isArray(seriesModel.get('samplingDim')) ? seriesModel.get('samplingDim') : false;
             var coordSys = seriesModel.coordinateSystem;
             // Only cartesian2d support down sampling
             if (coordSys.type === 'cartesian2d' && sampling) {
@@ -39857,14 +39872,9 @@ var dataSample = function (seriesType) {
                         sampler = sampling;
                     }
                     if (sampler) {
-                        var nextData;
-                        if (seriesType === 'candlestick') {
-                            nextData = data.downSample(['open', 'close', 'highest', 'lowest'], 1 / rate, sampler, indexSampler);
-                        } else {
-                            // Only support sample the first dim mapped from value axis.
-                            var dim = data.mapDimension(valueAxis.dim);
-                            nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);
-                        }
+                        // Only support sample the first dim mapped from value axis.
+                        var dim = samplingDim || data.mapDimension(valueAxis.dim);
+                        var nextData = data.downSample(dim, 1 / rate, sampler, indexSampler);
                         seriesModel.setData(nextData);
                     }
                 }
@@ -49253,6 +49263,14 @@ TooltipRichContent.prototype = {
         return this._show;
     },
 
+    dispose: function () {
+        clearTimeout(this._hideTimeout);
+
+        if (this.el) {
+            this._zr.remove(this.el);
+        }
+    },
+
     getOuterSize: function () {
         var size = this.getSize();
         return {
@@ -57369,10 +57387,20 @@ function trigger(controller, eventName, behaviorToCheck, e, contollerEvent) {
 // }
 // The value can be: true / false / 'shift' / 'ctrl' / 'alt'.
 function isAvailableBehavior(behaviorToCheck, e, settings) {
+    if (!behaviorToCheck) {
+        return true;
+    }
+
     var setting = settings[behaviorToCheck];
-    return !behaviorToCheck || (
-        setting && (!isString(setting) || e.event[setting + 'Key'])
-    );
+    if (setting === true) {
+        return true;
+    }
+
+    if (e.event[setting + 'Key']) {
+        return true;
+    }
+
+    return false;
 }
 
 /*
@@ -57570,6 +57598,9 @@ function mergeControllerParams(dataZoomInfos) {
         'type_undefined': -1
     };
     var preventDefaultMouseMove = true;
+    var zoomOnMouseWheel = true;
+    var moveOnMouseWheel = false;
+    var moveOnMouseMove = true;
 
     each$1(dataZoomInfos, function (dataZoomInfo) {
         var dataZoomModel = dataZoomInfo.dataZoomModel;
@@ -57585,6 +57616,9 @@ function mergeControllerParams(dataZoomInfos) {
         // Prevent default move event by default. If one false, do not prevent. Otherwise
         // users may be confused why it does not work when multiple insideZooms exist.
         preventDefaultMouseMove &= dataZoomModel.get('preventDefaultMouseMove', true);
+        zoomOnMouseWheel = dataZoomModel.get('zoomOnMouseWheel', true);
+        moveOnMouseWheel = dataZoomModel.get('moveOnMouseWheel', false);
+        moveOnMouseMove = dataZoomModel.get('moveOnMouseMove', true);
     });
 
     return {
@@ -57593,9 +57627,9 @@ function mergeControllerParams(dataZoomInfos) {
             // RoamController will enable all of these functionalities,
             // and the final behavior is determined by its event listener
             // provided by each inside zoom.
-            zoomOnMouseWheel: true,
-            moveOnMouseMove: true,
-            moveOnMouseWheel: true,
+            zoomOnMouseWheel: zoomOnMouseWheel,
+            moveOnMouseMove: moveOnMouseMove,
+            moveOnMouseWheel: moveOnMouseWheel,
             preventDefaultMouseMove: !!preventDefaultMouseMove
         }
     };
@@ -61033,7 +61067,7 @@ function updateZoomBtnStatus(featureModel, ecModel, view, payload, api) {
                 brushStyle: {
                     // FIXME user customized?
                     lineWidth: 0,
-                    fill: 'rgba(0,0,0,0.2)'
+                    fill: featureModel.option.backgroundColor || 'rgba(0,0,0,0.2)'
                 }
             }
             : false
