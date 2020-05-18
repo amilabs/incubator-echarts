@@ -244,7 +244,7 @@ function checkPointerAndTrigger(controller, eventName, behaviorToCheck, e, conto
         // When mouse is out of roamController rect,
         // default befavoius should not be be disabled, otherwise
         // page sliding is disabled, contrary to expectation.
-        eventTool.stop(e.event);
+        controller._opt.preventDefaultMouseMove && eventTool.stop(e.event);
 
         trigger(controller, eventName, behaviorToCheck, e, contollerEvent);
     }
