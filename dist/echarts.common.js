@@ -57314,7 +57314,7 @@ function mousewheel(e) {
     var originY = e.offsetY;
 
     // wheelDelta maybe -0 in chrome mac.
-    if (wheelDelta === 0 || (!shouldZoom && !shouldMove)) {
+    if (wheelDelta === 0 || (!shouldZoom && !shouldMove) || !this._opt.preventDefaultMouseMove) {
         return;
     }
 
@@ -57388,7 +57388,7 @@ function trigger(controller, eventName, behaviorToCheck, e, contollerEvent) {
 // The value can be: true / false / 'shift' / 'ctrl' / 'alt'.
 function isAvailableBehavior(behaviorToCheck, e, settings) {
     var setting = settings[behaviorToCheck];
-    return !setting || (
+    return !behaviorToCheck || (
         setting && (!isString(setting) || e.event[setting + 'Key'])
     );
 }
