@@ -48575,7 +48575,7 @@ function mousewheel(e) {
     var originY = e.offsetY;
 
     // wheelDelta maybe -0 in chrome mac.
-    if (wheelDelta === 0 || (!shouldZoom && !shouldMove) || !this._opt.preventDefaultMouseMove) {
+    if (wheelDelta === 0 || (!shouldZoom && !shouldMove)) {
         return;
     }
 
@@ -48648,10 +48648,20 @@ function trigger(controller, eventName, behaviorToCheck, e, contollerEvent) {
 // }
 // The value can be: true / false / 'shift' / 'ctrl' / 'alt'.
 function isAvailableBehavior(behaviorToCheck, e, settings) {
+    if (!behaviorToCheck) {
+        return true;
+    }
+
     var setting = settings[behaviorToCheck];
-    return !behaviorToCheck || (
-        setting && (!isString(setting) || e.event[setting + 'Key'])
-    );
+    if (setting === true) {
+        return true;
+    }
+
+    if (e.event[setting + 'Key']) {
+        return true;
+    }
+
+    return false;
 }
 
 /*
@@ -91462,6 +91472,9 @@ function mergeControllerParams(dataZoomInfos) {
         'type_undefined': -1
     };
     var preventDefaultMouseMove = true;
+    var zoomOnMouseWheel = true;
+    var moveOnMouseWheel = false;
+    var moveOnMouseMove = true;
 
     each$1(dataZoomInfos, function (dataZoomInfo) {
         var dataZoomModel = dataZoomInfo.dataZoomModel;
@@ -91477,6 +91490,9 @@ function mergeControllerParams(dataZoomInfos) {
         // Prevent default move event by default. If one false, do not prevent. Otherwise
         // users may be confused why it does not work when multiple insideZooms exist.
         preventDefaultMouseMove &= dataZoomModel.get('preventDefaultMouseMove', true);
+        zoomOnMouseWheel = dataZoomModel.get('zoomOnMouseWheel', true);
+        moveOnMouseWheel = dataZoomModel.get('moveOnMouseWheel', false);
+        moveOnMouseMove = dataZoomModel.get('moveOnMouseMove', true);
     });
 
     return {
@@ -91485,9 +91501,9 @@ function mergeControllerParams(dataZoomInfos) {
             // RoamController will enable all of these functionalities,
             // and the final behavior is determined by its event listener
             // provided by each inside zoom.
-            zoomOnMouseWheel: true,
-            moveOnMouseMove: true,
-            moveOnMouseWheel: true,
+            zoomOnMouseWheel: zoomOnMouseWheel,
+            moveOnMouseMove: moveOnMouseMove,
+            moveOnMouseWheel: moveOnMouseWheel,
             preventDefaultMouseMove: !!preventDefaultMouseMove
         }
     };
