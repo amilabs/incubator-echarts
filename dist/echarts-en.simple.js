@@ -9948,6 +9948,10 @@ Painter.prototype = {
             if (this._layerConfig[zlevel]) {
                 merge(layer, this._layerConfig[zlevel], true);
             }
+            // TODO Remove EL_AFTER_INCREMENTAL_INC magic number
+            else if (this._layerConfig[zlevel - EL_AFTER_INCREMENTAL_INC]) {
+                merge(layer, this._layerConfig[zlevel - EL_AFTER_INCREMENTAL_INC], true);
+            }
 
             if (virtual) {
                 layer.virtual = virtual;
@@ -10100,12 +10104,26 @@ Painter.prototype = {
 
         var prevLayer = null;
         var incrementalLayerCount = 0;
+        var prevZlevel;
         for (var i = 0; i < list.length; i++) {
             var el = list[i];
             var zlevel = el.zlevel;
             var layer;
-            // PENDING If change one incremental element style ?
-            // TODO Where there are non-incremental elements between incremental elements.
+
+            if (prevZlevel !== zlevel) {
+                prevZlevel = zlevel;
+                incrementalLayerCount = 0;
+            }
+
+            // TODO Not use magic number on zlevel.
+
+            // Each layer with increment element can be separated to 3 layers.
+            //          (Other Element drawn after incremental element)
+            // -----------------zlevel + EL_AFTER_INCREMENTAL_INC--------------------
+            //                      (Incremental element)
+            // ----------------------zlevel + INCREMENTAL_INC------------------------
+            //              (Element drawn before incremental element)
+            // --------------------------------zlevel--------------------------------
             if (el.incremental) {
                 layer = this.getLayer(zlevel + INCREMENTAL_INC, this._needsManuallyCompositing);
                 layer.incremental = true;
@@ -10200,6 +10218,7 @@ Painter.prototype = {
 
             for (var i = 0; i < this._zlevelList.length; i++) {
                 var _zlevel = this._zlevelList[i];
+                // TODO Remove EL_AFTER_INCREMENTAL_INC magic number
                 if (_zlevel === zlevel || _zlevel === zlevel + EL_AFTER_INCREMENTAL_INC) {
                     var layer = this._layers[_zlevel];
                     merge(layer, layerConfig[zlevel], true);
@@ -11270,7 +11289,7 @@ var painterCtors = {
 /**
  * @type {string}
  */
-var version$1 = '4.3.0';
+var version$1 = '4.3.1';
 
 /**
  * Initializing a zrender instance
@@ -25572,7 +25591,7 @@ var proto = Scheduler.prototype;
  * @param {Object} payload
  */
 proto.restoreData = function (ecModel, payload) {
-    // TODO: Only restroe needed series and components, but not all components.
+    // TODO: Only restore needed series and components, but not all components.
     // Currently `restoreData` of all of the series and component will be called.
     // But some independent components like `title`, `legend`, `graphic`, `toolbox`,
     // `tooltip`, `axisPointer`, etc, do not need series refresh when `setOption`,
@@ -27149,10 +27168,10 @@ var isFunction = isFunction$1;
 var isObject = isObject$1;
 var parseClassType = ComponentModel.parseClassType;
 
-var version = '4.7.0';
+var version = '4.8.0';
 
 var dependencies = {
-    zrender: '4.3.0'
+    zrender: '4.3.1'
 };
 
 var TEST_FRAME_REMAIN_TIME = 1;
@@ -37793,7 +37812,7 @@ function niceScaleExtent(scale, model) {
     scale.niceExtent({
         splitNumber: splitNumber,
         fixMin: extentInfo.fixMin,
-        fixMax: extentInfo.fixMin,
+        fixMax: extentInfo.fixMax,
         minInterval: (scaleType === 'interval' || scaleType === 'time')
             ? model.get('minInterval') : null,
         maxInterval: (scaleType === 'interval' || scaleType === 'time')
@@ -42250,7 +42269,10 @@ extendChartView({
                     var bgLayout = getLayout[coord.type](data, dataIndex);
                     var bgEl = createBackgroundEl(coord, isHorizontalOrRadial, bgLayout);
                     bgEl.useStyle(backgroundModel.getBarItemStyle());
-                    bgEl.setShape('r', barBorderRadius);
+                    // Only cartesian2d support borderRadius.
+                    if (coord.type === 'cartesian2d') {
+                        bgEl.setShape('r', barBorderRadius);
+                    }
                     bgEls[dataIndex] = bgEl;
                 }
 
@@ -42287,7 +42309,10 @@ extendChartView({
                 if (drawBackground) {
                     var bgEl = oldBgEls[oldIndex];
                     bgEl.useStyle(backgroundModel.getBarItemStyle());
-                    bgEl.setShape('r', barBorderRadius);
+                    // Only cartesian2d support borderRadius.
+                    if (coord.type === 'cartesian2d') {
+                        bgEl.setShape('r', barBorderRadius);
+                    }
                     bgEls[newIndex] = bgEl;
 
                     var bgLayout = getLayout[coord.type](data, newIndex);
@@ -42448,8 +42473,31 @@ var clip = {
         return clipped;
     },
 
-    polar: function (coordSysClipArea) {
-        return false;
+    polar: function (coordSysClipArea, layout) {
+        var signR = layout.r0 <= layout.r ? 1 : -1;
+        // Make sure r is larger than r0
+        if (signR < 0) {
+            var r = layout.r;
+            layout.r = layout.r0;
+            layout.r0 = r;
+        }
+
+        var r = mathMin$4(layout.r, coordSysClipArea.r);
+        var r0 = mathMax$4(layout.r0, coordSysClipArea.r0);
+
+        layout.r = r;
+        layout.r0 = r0;
+
+        var clipped = r - r0 < 0;
+
+        // Reverse back
+        if (signR < 0) {
+            var r = layout.r;
+            layout.r = layout.r0;
+            layout.r0 = r;
+        }
+
+        return clipped;
     }
 };
 

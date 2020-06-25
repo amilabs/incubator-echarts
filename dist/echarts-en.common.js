@@ -10252,6 +10252,10 @@ Painter.prototype = {
             if (this._layerConfig[zlevel]) {
                 merge(layer, this._layerConfig[zlevel], true);
             }
+            // TODO Remove EL_AFTER_INCREMENTAL_INC magic number
+            else if (this._layerConfig[zlevel - EL_AFTER_INCREMENTAL_INC]) {
+                merge(layer, this._layerConfig[zlevel - EL_AFTER_INCREMENTAL_INC], true);
+            }
 
             if (virtual) {
                 layer.virtual = virtual;
@@ -10404,12 +10408,26 @@ Painter.prototype = {
 
         var prevLayer = null;
         var incrementalLayerCount = 0;
+        var prevZlevel;
         for (var i = 0; i < list.length; i++) {
             var el = list[i];
             var zlevel = el.zlevel;
             var layer;
-            // PENDING If change one incremental element style ?
-            // TODO Where there are non-incremental elements between incremental elements.
+
+            if (prevZlevel !== zlevel) {
+                prevZlevel = zlevel;
+                incrementalLayerCount = 0;
+            }
+
+            // TODO Not use magic number on zlevel.
+
+            // Each layer with increment element can be separated to 3 layers.
+            //          (Other Element drawn after incremental element)
+            // -----------------zlevel + EL_AFTER_INCREMENTAL_INC--------------------
+            //                      (Incremental element)
+            // ----------------------zlevel + INCREMENTAL_INC------------------------
+            //              (Element drawn before incremental element)
+            // --------------------------------zlevel--------------------------------
             if (el.incremental) {
                 layer = this.getLayer(zlevel + INCREMENTAL_INC, this._needsManuallyCompositing);
                 layer.incremental = true;
@@ -10504,6 +10522,7 @@ Painter.prototype = {
 
             for (var i = 0; i < this._zlevelList.length; i++) {
                 var _zlevel = this._zlevelList[i];
+                // TODO Remove EL_AFTER_INCREMENTAL_INC magic number
                 if (_zlevel === zlevel || _zlevel === zlevel + EL_AFTER_INCREMENTAL_INC) {
                     var layer = this._layers[_zlevel];
                     merge(layer, layerConfig[zlevel], true);
@@ -11576,7 +11595,7 @@ var instances$1 = {};    // ZRender实例map索引
 /**
  * @type {string}
  */
-var version$1 = '4.3.0';
+var version$1 = '4.3.1';
 
 /**
  * Initializing a zrender instance
@@ -26146,7 +26165,7 @@ var proto = Scheduler.prototype;
  * @param {Object} payload
  */
 proto.restoreData = function (ecModel, payload) {
-    // TODO: Only restroe needed series and components, but not all components.
+    // TODO: Only restore needed series and components, but not all components.
     // Currently `restoreData` of all of the series and component will be called.
     // But some independent components like `title`, `legend`, `graphic`, `toolbox`,
     // `tooltip`, `axisPointer`, etc, do not need series refresh when `setOption`,
@@ -27723,10 +27742,10 @@ var isFunction = isFunction$1;
 var isObject = isObject$1;
 var parseClassType = ComponentModel.parseClassType;
 
-var version = '4.7.0';
+var version = '4.8.0';
 
 var dependencies = {
-    zrender: '4.3.0'
+    zrender: '4.3.1'
 };
 
 var TEST_FRAME_REMAIN_TIME = 1;
@@ -35411,7 +35430,7 @@ function niceScaleExtent(scale, model) {
     scale.niceExtent({
         splitNumber: splitNumber,
         fixMin: extentInfo.fixMin,
-        fixMax: extentInfo.fixMin,
+        fixMax: extentInfo.fixMax,
         minInterval: (scaleType === 'interval' || scaleType === 'time')
             ? model.get('minInterval') : null,
         maxInterval: (scaleType === 'interval' || scaleType === 'time')
@@ -36485,7 +36504,7 @@ var parseGeoJSON = function (geoJson, nameProperty) {
         }
 
         var region = new Region(
-            properties[nameProperty],
+            properties[nameProperty || 'name'],
             geometries,
             properties.cp
         );
@@ -43572,7 +43591,10 @@ extendChartView({
                     var bgLayout = getLayout[coord.type](data, dataIndex);
                     var bgEl = createBackgroundEl(coord, isHorizontalOrRadial, bgLayout);
                     bgEl.useStyle(backgroundModel.getBarItemStyle());
-                    bgEl.setShape('r', barBorderRadius);
+                    // Only cartesian2d support borderRadius.
+                    if (coord.type === 'cartesian2d') {
+                        bgEl.setShape('r', barBorderRadius);
+                    }
                     bgEls[dataIndex] = bgEl;
                 }
 
@@ -43609,7 +43631,10 @@ extendChartView({
                 if (drawBackground) {
                     var bgEl = oldBgEls[oldIndex];
                     bgEl.useStyle(backgroundModel.getBarItemStyle());
-                    bgEl.setShape('r', barBorderRadius);
+                    // Only cartesian2d support borderRadius.
+                    if (coord.type === 'cartesian2d') {
+                        bgEl.setShape('r', barBorderRadius);
+                    }
                     bgEls[newIndex] = bgEl;
 
                     var bgLayout = getLayout[coord.type](data, newIndex);
@@ -43770,8 +43795,31 @@ var clip = {
         return clipped;
     },
 
-    polar: function (coordSysClipArea) {
-        return false;
+    polar: function (coordSysClipArea, layout) {
+        var signR = layout.r0 <= layout.r ? 1 : -1;
+        // Make sure r is larger than r0
+        if (signR < 0) {
+            var r = layout.r;
+            layout.r = layout.r0;
+            layout.r0 = r;
+        }
+
+        var r = mathMin$4(layout.r, coordSysClipArea.r);
+        var r0 = mathMax$4(layout.r0, coordSysClipArea.r0);
+
+        layout.r = r;
+        layout.r0 = r0;
+
+        var clipped = r - r0 < 0;
+
+        // Reverse back
+        if (signR < 0) {
+            var r = layout.r;
+            layout.r = layout.r0;
+            layout.r0 = r;
+        }
+
+        return clipped;
     }
 };
 
@@ -53037,22 +53085,29 @@ function makeSymbolTypeKey(symbolCategory) {
  * @inner
  */
 function createSymbol$1(name, lineData, idx) {
-    var color = lineData.getItemVisual(idx, 'color');
     var symbolType = lineData.getItemVisual(idx, name);
-    var symbolSize = lineData.getItemVisual(idx, name + 'Size');
 
     if (!symbolType || symbolType === 'none') {
         return;
     }
 
+    var color = lineData.getItemVisual(idx, 'color');
+    var symbolSize = lineData.getItemVisual(idx, name + 'Size');
+    var symbolRotate = lineData.getItemVisual(idx, name + 'Rotate');
+
     if (!isArray(symbolSize)) {
         symbolSize = [symbolSize, symbolSize];
     }
+
     var symbolPath = createSymbol(
         symbolType, -symbolSize[0] / 2, -symbolSize[1] / 2,
         symbolSize[0], symbolSize[1], color
     );
 
+    // rotate by default if symbolRotate is not specified or NaN
+    symbolPath.rotation = symbolRotate == null || isNaN(symbolRotate)
+        ? undefined
+        : +symbolRotate * Math.PI / 180 || 0;
     symbolPath.name = name;
 
     return symbolPath;
@@ -53120,18 +53175,32 @@ function updateSymbolAndLabelBeforeLineUpdate() {
 
     if (symbolFrom) {
         symbolFrom.attr('position', fromPos);
-        var tangent = line.tangentAt(0);
-        symbolFrom.attr('rotation', Math.PI / 2 - Math.atan2(
-            tangent[1], tangent[0]
-        ));
+        // Fix #12388
+        // when symbol is set to be 'arrow' in markLine,
+        // symbolRotate value will be ignored, and compulsively use tangent angle.
+        // rotate by default if symbol rotation is not specified
+        if (symbolFrom.rotation == null
+            || (symbolFrom.shape && symbolFrom.shape.symbolType === 'arrow')) {
+            var tangent = line.tangentAt(0);
+            symbolFrom.attr('rotation', Math.PI / 2 - Math.atan2(
+                tangent[1], tangent[0]
+            ));
+        }
         symbolFrom.attr('scale', [invScale * percent, invScale * percent]);
     }
     if (symbolTo) {
         symbolTo.attr('position', toPos);
-        var tangent = line.tangentAt(1);
-        symbolTo.attr('rotation', -Math.PI / 2 - Math.atan2(
-            tangent[1], tangent[0]
-        ));
+        // Fix #12388
+        // when symbol is set to be 'arrow' in markLine,
+        // symbolRotate value will be ignored, and compulsively use tangent angle.
+        // rotate by default if symbol rotation is not specified
+        if (symbolTo.rotation == null
+            || (symbolTo.shape && symbolTo.shape.symbolType === 'arrow')) {
+            var tangent = line.tangentAt(1);
+            symbolTo.attr('rotation', -Math.PI / 2 - Math.atan2(
+                tangent[1], tangent[0]
+            ));
+        }
         symbolTo.attr('scale', [invScale * percent, invScale * percent]);
     }
 
@@ -53927,8 +53996,10 @@ MarkerView.extend({
             ]);
 
             lineData.setItemVisual(idx, {
+                'fromSymbolRotate': fromData.getItemVisual(idx, 'symbolRotate'),
                 'fromSymbolSize': fromData.getItemVisual(idx, 'symbolSize'),
                 'fromSymbol': fromData.getItemVisual(idx, 'symbol'),
+                'toSymbolRotate': toData.getItemVisual(idx, 'symbolRotate'),
                 'toSymbolSize': toData.getItemVisual(idx, 'symbolSize'),
                 'toSymbol': toData.getItemVisual(idx, 'symbol')
             });
@@ -53950,8 +54021,8 @@ MarkerView.extend({
             updateSingleMarkerEndLayout(
                 data, idx, isFrom, seriesModel, api
             );
-
             data.setItemVisual(idx, {
+                symbolRotate: itemModel.get('symbolRotate'),
                 symbolSize: itemModel.get('symbolSize') || symbolSize[isFrom ? 0 : 1],
                 symbol: itemModel.get('symbol', true) || symbolType[isFrom ? 0 : 1],
                 color: itemModel.get('itemStyle.color') || seriesData.getVisual('color')
@@ -58404,7 +58475,8 @@ proto$2.onclick = function (ecModel, api) {
         $a.target = '_blank';
         $a.href = url;
         var evt = new MouseEvent('click', {
-            view: window,
+            // some micro front-end framework， window maybe is a Proxy
+            view: document.defaultView,
             bubbles: true,
             cancelable: false
         });
@@ -64145,11 +64217,16 @@ var SVGPainter = function (root, storage, opts, zrId) {
     this.storage = storage;
     this._opts = opts = extend({}, opts || {});
 
-    var svgRoot = createElement('svg');
-    svgRoot.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    svgRoot.setAttribute('version', '1.1');
-    svgRoot.setAttribute('baseProfile', 'full');
-    svgRoot.style.cssText = 'user-select:none;position:absolute;left:0;top:0;';
+    var svgDom = createElement('svg');
+    svgDom.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svgDom.setAttribute('version', '1.1');
+    svgDom.setAttribute('baseProfile', 'full');
+    svgDom.style.cssText = 'user-select:none;position:absolute;left:0;top:0;';
+
+    var bgRoot = createElement('g');
+    svgDom.appendChild(bgRoot);
+    var svgRoot = createElement('g');
+    svgDom.appendChild(svgRoot);
 
     this.gradientManager = new GradientManager(zrId, svgRoot);
     this.clipPathManager = new ClippathManager(zrId, svgRoot);
@@ -64158,11 +64235,13 @@ var SVGPainter = function (root, storage, opts, zrId) {
     var viewport = document.createElement('div');
     viewport.style.cssText = 'overflow:hidden;position:relative';
 
+    this._svgDom = svgDom;
     this._svgRoot = svgRoot;
+    this._backgroundRoot = bgRoot;
     this._viewport = viewport;
 
     root.appendChild(viewport);
-    viewport.appendChild(svgRoot);
+    viewport.appendChild(svgDom);
 
     this.resize(opts.width, opts.height);
 
@@ -64179,6 +64258,14 @@ SVGPainter.prototype = {
 
     getViewportRoot: function () {
         return this._viewport;
+    },
+
+    getSvgDom: function () {
+        return this._svgDom;
+    },
+
+    getSvgRoot: function () {
+        return this._svgRoot;
     },
 
     getViewportRootOffset: function () {
@@ -64200,7 +64287,21 @@ SVGPainter.prototype = {
 
     setBackgroundColor: function (backgroundColor) {
         // TODO gradient
-        this._viewport.style.background = backgroundColor;
+        // Insert a bg rect instead of setting background to viewport.
+        // Otherwise, the exported SVG don't have background.
+        if (this._backgroundRoot && this._backgroundNode) {
+            this._backgroundRoot.removeChild(this._backgroundNode);
+        }
+
+        var bgNode = createElement('rect');
+        bgNode.setAttribute('width', this.getWidth());
+        bgNode.setAttribute('height', this.getHeight());
+        bgNode.setAttribute('x', 0);
+        bgNode.setAttribute('y', 0);
+        bgNode.setAttribute('id', 0);
+        bgNode.style.fill = backgroundColor;
+        this._backgroundRoot.appendChild(bgNode);
+        this._backgroundNode = bgNode;
     },
 
     _paintList: function (list) {
@@ -64330,8 +64431,8 @@ SVGPainter.prototype = {
     },
 
     _getDefs: function (isForceCreating) {
-        var svgRoot = this._svgRoot;
-        var defs = this._svgRoot.getElementsByTagName('defs');
+        var svgRoot = this._svgDom;
+        var defs = svgRoot.getElementsByTagName('defs');
         if (defs.length === 0) {
             // Not exist
             if (isForceCreating) {
@@ -64388,10 +64489,15 @@ SVGPainter.prototype = {
             viewportStyle.width = width + 'px';
             viewportStyle.height = height + 'px';
 
-            var svgRoot = this._svgRoot;
+            var svgRoot = this._svgDom;
             // Set width by 'svgRoot.width = width' is invalid
             svgRoot.setAttribute('width', width);
             svgRoot.setAttribute('height', height);
+        }
+
+        if (this._backgroundNode) {
+            this._backgroundNode.setAttribute('width', width);
+            this._backgroundNode.setAttribute('height', height);
         }
     },
 
@@ -64434,10 +64540,13 @@ SVGPainter.prototype = {
     dispose: function () {
         this.root.innerHTML = '';
 
-        this._svgRoot =
-            this._viewport =
-            this.storage =
-            null;
+        this._svgRoot
+            = this._backgroundRoot
+            = this._svgDom
+            = this._backgroundNode
+            = this._viewport
+            = this.storage
+            = null;
     },
 
     clear: function () {
@@ -64446,9 +64555,9 @@ SVGPainter.prototype = {
         }
     },
 
-    pathToDataUrl: function () {
+    toDataURL: function () {
         this.refresh();
-        var html = this._svgRoot.outerHTML;
+        var html = encodeURIComponent(this._svgDom.outerHTML.replace(/></g, '>\n\r<'));
         return 'data:image/svg+xml;charset=UTF-8,' + html;
     }
 };
@@ -64464,7 +64573,7 @@ function createMethodNotSupport$1(method) {
 each$1([
     'getLayer', 'insertLayer', 'eachLayer', 'eachBuiltinLayer',
     'eachOtherLayer', 'getLayers', 'modLayer', 'delLayer', 'clearLayer',
-    'toDataURL', 'pathToImage'
+    'pathToImage'
 ], function (name) {
     SVGPainter.prototype[name] = createMethodNotSupport$1(name);
 });
