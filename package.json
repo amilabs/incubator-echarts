@@ -10,7 +10,7 @@
   "homepage": "http://echarts.apache.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/apache/incubator-echarts.git"
+    "url": "https://github.com/amilabs/incubator-echarts.git"
   },
   "scripts": {
     "release": "node build/build.js --release",
