@@ -16,7 +16,7 @@ pipeline {
           }
           steps {
                 script{
-                    withCredentials([string(credentialsId: 'amilabs-npm-token', variable: 'NPM_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'xereverex-github-access-token', variable: 'NPM_TOKEN')]) {
                         sh 'npm i'
                         sh "echo //registry.npmjs.org/:_authToken=${env.NPM_TOKEN} > .npmrc"
                         sh "echo email=jenkins@amilabs.pro >> .npmrc"
