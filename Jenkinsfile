@@ -9,7 +9,11 @@ pipeline {
           }
         }
         stage("Publish") {
-          when { tag 'v*' }
+          when {
+              expression {
+                  return sh(script: 'git tag --points-at | grep "^v" || true', returnStdout: true).trim().length() > 0
+              }
+          }
           steps {
                 script{
                     withCredentials([string(credentialsId: 'amilabs-npm-token', variable: 'NPM_TOKEN')]) {
