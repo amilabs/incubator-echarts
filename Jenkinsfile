@@ -1,11 +1,11 @@
 pipeline {
-    agent { label "node12" }
+    agent { label "builder" }
     options { disableConcurrentBuilds() }
     stages {
         stage("Checkout") {
           steps {
             cleanWs()
-            checkout([$class: 'GitSCM', branches: [[name: '$BRANCH_NAME']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '83ff6dc5-45b4-4996-b383-e1f225203f3c', url: 'git@github.com:amilabs/incubator-echarts.git']]])
+            checkout([$class: 'GitSCM', branches: [[name: '$BRANCH_NAME']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github', url: 'git@github.com:amilabs/incubator-echarts.git']]])
           }
         }
         stage("Publish") {
