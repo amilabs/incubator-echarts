@@ -364,9 +364,11 @@ echartsProto.setOption = function (option, notMerge, lazyUpdate) {
     }
 
     var silent;
+    var withoutZoomUpdate;
     if (isObject(notMerge)) {
         lazyUpdate = notMerge.lazyUpdate;
         silent = notMerge.silent;
+        withoutZoomUpdate = notMerge.withoutZoomUpdate;
         notMerge = notMerge.notMerge;
     }
 
@@ -389,7 +391,7 @@ echartsProto.setOption = function (option, notMerge, lazyUpdate) {
     else {
         prepare(this);
 
-        updateMethods.update.call(this);
+        updateMethods.update.call(this, undefined, withoutZoomUpdate);
 
         // Ensure zr refresh sychronously, and then pixel in canvas can be
         // fetched after `setOption`.
@@ -844,9 +846,10 @@ var updateMethods = {
 
     /**
      * @param {Object} payload
+     * @param {Boolean | undefined} withoutZoom
      * @private
      */
-    update: function (payload) {
+    update: function (payload, withoutZoom) {
         // console.profile && console.profile('update');
 
         var ecModel = this._model;
@@ -888,7 +891,7 @@ var updateMethods = {
         clearColorPalette(ecModel);
         scheduler.performVisualTasks(ecModel, payload);
 
-        render(this, ecModel, api, payload);
+        render(this, ecModel, api, payload, withoutZoom);
 
         // Set background
         var backgroundColor = ecModel.get('backgroundColor') || 'transparent';
@@ -1525,9 +1528,9 @@ function clearColorPalette(ecModel) {
     });
 }
 
-function render(ecIns, ecModel, api, payload) {
+function render(ecIns, ecModel, api, payload, withoutZoom) {
 
-    renderComponents(ecIns, ecModel, api, payload);
+    renderComponents(ecIns, ecModel, api, payload, undefined, withoutZoom);
 
     each(ecIns._chartsViews, function (chart) {
         chart.__alive = false;
@@ -1543,12 +1546,14 @@ function render(ecIns, ecModel, api, payload) {
     });
 }
 
-function renderComponents(ecIns, ecModel, api, payload, dirtyList) {
+function renderComponents(ecIns, ecModel, api, payload, dirtyList, withoutZoom) {
     each(dirtyList || ecIns._componentsViews, function (componentView) {
         var componentModel = componentView.__model;
-        componentView.render(componentModel, ecModel, api, payload);
 
-        updateZ(componentModel, componentView);
+        if (!(withoutZoom && componentModel.mainType === 'dataZoom' && componentModel.subType === 'slider')) {
+            componentView.render(componentModel, ecModel, api, payload);
+            updateZ(componentModel, componentView);
+        }
     });
 }
 
